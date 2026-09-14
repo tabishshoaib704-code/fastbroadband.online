@@ -1278,8 +1278,15 @@
       var hlColor = state.highlightColor, rColor = state.rectColor, rWidth = state.rectWidth;
       await mutate(function (doc) {
         var page = doc.getPage(pageIndex2);
-        if (tool === "whiteout" || tool === "edittext") {
+        if (tool === "whiteout") {
           page.drawRectangle({ x: x, y: y, width: w, height: h, color: PDFLib.rgb(1, 1, 1), opacity: 1 });
+        } else if (tool === "edittext") {
+          // Pad beyond the dragged box: the tool has no way to know exactly
+          // where the source glyphs end, so a close-but-not-generous drag
+          // would otherwise leave descenders (g, y, p...) peeking out below.
+          var padX = Math.max(3, w * 0.04, h * 0.15);
+          var padY = Math.max(3, h * 0.3);
+          page.drawRectangle({ x: x - padX, y: y - padY, width: w + padX * 2, height: h + padY * 2, color: PDFLib.rgb(1, 1, 1), opacity: 1 });
         } else if (tool === "rect") {
           page.drawRectangle({ x: x, y: y, width: w, height: h, borderColor: rgbFromHex(rColor), borderWidth: rWidth });
         } else {
@@ -1355,7 +1362,7 @@
           '<button data-v="mono" class="' + (state.textFont === "mono" ? "active" : "") + '">Mono</button>' +
         '</div></div>' +
         '<div class="field"><span class="field-label">Color</span>' + colorSwatchesHtml("textColor", ["#182333", "#2952CC", "#C43D3D", "#2E7D5B"], state.textColor) + '</div>' +
-        '<p class="hint">Drag a box over existing text to cover it and type a replacement. The text size starts matched to the box height — adjust it after typing if needed.</p>';
+        '<p class="hint">Drag a box over existing text to cover it and type a replacement. The text size starts matched to the box height — adjust it after typing if needed.<br><br><strong>Not for sensitive info:</strong> this covers the old text visually but doesn’t remove it from the file — it can still be found by selecting or searching the exported PDF.</p>';
       document.getElementById("fontSeg").querySelectorAll("button").forEach(function (b) {
         b.addEventListener("click", function () { state.textFont = b.dataset.v; renderProps(); });
       });
