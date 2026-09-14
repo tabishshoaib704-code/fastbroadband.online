@@ -1,0 +1,1577 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Quire — a browser-based PDF editor: add text, draw, highlight, white-out, images and signatures, reorder or rotate pages, merge documents, and export a new PDF, entirely in your browser.">
+</head>
+<body>
+<title>Quire</title>
+<style>
+  :root {
+    --bg: #EEF0F2;
+    --surface: #FFFFFF;
+    --surface-2: #F7F8F9;
+    --ink: #182333;
+    --ink-soft: #5C6B7D;
+    --ink-faint: #8B95A3;
+    --line: #D7DBE0;
+    --line-strong: #B7BEC7;
+    --accent: #2952CC;
+    --accent-ink: #16307A;
+    --accent-soft: #E7ECFB;
+    --highlight: #F0A93B;
+    --danger: #C43D3D;
+    --danger-soft: #FBEAEA;
+    --shadow: 0 8px 24px rgba(24, 35, 51, 0.14), 0 1px 2px rgba(24, 35, 51, 0.08);
+    --font-ui: 'IBM Plex Sans', -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14181F;
+      --surface: #1B212B;
+      --surface-2: #12161D;
+      --ink: #EDEFF3;
+      --ink-soft: #9AA4B2;
+      --ink-faint: #6C7684;
+      --line: #2B323D;
+      --line-strong: #3A4351;
+      --accent: #7098FF;
+      --accent-ink: #B7C9FF;
+      --accent-soft: rgba(112, 152, 255, 0.16);
+      --highlight: #E3A44B;
+      --danger: #E36767;
+      --danger-soft: rgba(227, 103, 103, 0.14);
+      --shadow: 0 8px 28px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.3);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14181F;
+    --surface: #1B212B;
+    --surface-2: #12161D;
+    --ink: #EDEFF3;
+    --ink-soft: #9AA4B2;
+    --ink-faint: #6C7684;
+    --line: #2B323D;
+    --line-strong: #3A4351;
+    --accent: #7098FF;
+    --accent-ink: #B7C9FF;
+    --accent-soft: rgba(112, 152, 255, 0.16);
+    --highlight: #E3A44B;
+    --danger: #E36767;
+    --danger-soft: rgba(227, 103, 103, 0.14);
+    --shadow: 0 8px 28px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.3);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-ui);
+    -webkit-font-smoothing: antialiased;
+  }
+  button { font-family: inherit; }
+  input, textarea, select { font-family: inherit; color: inherit; }
+
+  .app {
+    height: 100dvh;
+    min-height: 480px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ---------- Toolbar ---------- */
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 0 14px;
+    height: 56px;
+    flex: none;
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+    z-index: 20;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: none;
+  }
+  .brand svg { display: block; color: var(--accent); }
+  .brand-name {
+    font-weight: 600;
+    font-size: 15px;
+    letter-spacing: 0.01em;
+  }
+  .divider {
+    width: 1px;
+    align-self: stretch;
+    margin: 12px 0;
+    background: var(--line);
+    flex: none;
+  }
+  .file-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+  .filename-field {
+    display: flex;
+    align-items: baseline;
+    gap: 2px;
+    min-width: 0;
+  }
+  #filenameInput {
+    border: none;
+    background: transparent;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ink);
+    padding: 6px 2px;
+    border-radius: 6px;
+    min-width: 40px;
+    max-width: 220px;
+  }
+  #filenameInput:hover { background: var(--surface-2); }
+  #filenameInput:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; background: var(--surface-2); }
+  .ext-label { color: var(--ink-faint); font-size: 13px; font-family: var(--font-mono); }
+  .page-badge {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--ink-soft);
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 3px 9px;
+    white-space: nowrap;
+  }
+
+  .tool-group {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 2px;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 3px;
+    flex: none;
+    margin: 0 auto;
+  }
+  .icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border: none;
+    background: transparent;
+    color: var(--ink-soft);
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .icon-btn:hover { background: var(--surface); color: var(--ink); }
+  .icon-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .icon-btn[disabled] { opacity: 0.35; cursor: not-allowed; }
+  .icon-btn[disabled]:hover { background: transparent; color: var(--ink-soft); }
+  .tool-group .icon-btn.active {
+    background: var(--accent);
+    color: #fff;
+  }
+  .tool-group .icon-btn { width: 38px; height: 38px; }
+
+  .right-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: none;
+    margin-left: auto;
+  }
+  .zoom-control {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 3px;
+  }
+  .zoom-readout {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    width: 44px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink);
+    font-size: 13.5px;
+    font-weight: 500;
+    padding: 8px 13px;
+    border-radius: 9px;
+    cursor: pointer;
+  }
+  .btn:hover { background: var(--surface-2); }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .btn-primary:hover { background: var(--accent-ink); border-color: var(--accent-ink); }
+  .btn-ghost { background: transparent; border-color: transparent; }
+  .btn-ghost:hover { background: var(--surface-2); }
+  .rail-toggle { display: none; }
+
+  /* ---------- Workspace ---------- */
+  .workspace {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+    position: relative;
+  }
+
+  .rail {
+    flex: none;
+    background: var(--surface-2);
+    border-right: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .rail-pages { width: 176px; }
+  .rail-props { width: 232px; border-right: none; border-left: 1px solid var(--line); }
+  .rail-head {
+    padding: 12px 12px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    flex: none;
+  }
+  .rail-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 10px 10px;
+  }
+  .rail-foot {
+    flex: none;
+    padding: 10px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .thumb {
+    position: relative;
+    border: 2px solid transparent;
+    border-radius: 10px;
+    padding: 8px 8px 6px;
+    margin-bottom: 8px;
+    cursor: grab;
+    background: transparent;
+  }
+  .thumb:hover { background: var(--surface); }
+  .thumb.active { border-color: var(--accent); background: var(--surface); }
+  .thumb-canvas-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--surface);
+    border: 1px solid var(--line-strong);
+    box-shadow: 0 1px 3px rgba(24,35,51,0.12);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .thumb-canvas-wrap canvas { display: block; }
+  .thumb-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 6px;
+  }
+  .thumb-num {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--ink-soft);
+  }
+  .thumb-actions { display: flex; gap: 2px; opacity: 0; }
+  .thumb:hover .thumb-actions, .thumb.active .thumb-actions { opacity: 1; }
+  .thumb-actions .icon-btn { width: 24px; height: 24px; }
+  .thumb-actions .icon-btn svg { width: 14px; height: 14px; }
+
+  .rail-props .field { margin-bottom: 16px; }
+  .rail-props .field-label {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    margin-bottom: 8px;
+    display: block;
+  }
+  .swatches { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .swatch {
+    width: 24px; height: 24px;
+    border-radius: 999px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    padding: 0;
+  }
+  .swatch.active { border-color: var(--ink); box-shadow: 0 0 0 2px var(--surface-2); }
+  .swatch-custom {
+    width: 24px; height: 24px;
+    padding: 0;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    overflow: hidden;
+    background: conic-gradient(from 90deg, red, yellow, lime, cyan, blue, magenta, red);
+  }
+  .swatch-custom input[type=color] { opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+  .seg {
+    display: flex;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .seg button {
+    flex: 1;
+    border: none;
+    background: var(--surface);
+    color: var(--ink-soft);
+    font-size: 12.5px;
+    padding: 7px 4px;
+    cursor: pointer;
+    border-left: 1px solid var(--line);
+  }
+  .seg button:first-child { border-left: none; }
+  .seg button.active { background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
+  .num-input-row { display: flex; align-items: center; gap: 8px; }
+  .num-input-row input[type=range] { flex: 1; accent-color: var(--accent); }
+  .num-input {
+    width: 54px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    padding: 6px 7px;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    background: var(--surface);
+    color: var(--ink);
+  }
+  .kv { display: flex; justify-content: space-between; padding: 5px 0; font-size: 12.5px; }
+  .kv dt { color: var(--ink-soft); }
+  .kv dd { margin: 0; font-family: var(--font-mono); color: var(--ink); }
+  .stack-gap { display: flex; flex-direction: column; gap: 8px; }
+  .hint {
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--ink-faint);
+    border-top: 1px solid var(--line);
+    padding-top: 12px;
+    margin-top: auto;
+  }
+  .props-empty { padding: 4px 0 0; font-size: 12.5px; color: var(--ink-faint); line-height: 1.6; }
+  .upload-status {
+    font-size: 12px;
+    color: var(--ink-soft);
+    background: var(--surface);
+    border: 1px dashed var(--line-strong);
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin: 8px 0 0;
+    word-break: break-word;
+  }
+
+  /* ---------- Page nav ---------- */
+  .page-nav {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 7px 14px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+  }
+  .page-nav-counter {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    font-variant-numeric: tabular-nums;
+  }
+  .page-nav-counter input {
+    width: 44px;
+    text-align: center;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    padding: 5px 4px;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    background: var(--surface);
+    color: var(--ink);
+  }
+  .page-nav .divider { margin: 0 2px; }
+
+  /* ---------- Stage ---------- */
+  .stage {
+    flex: 1;
+    min-width: 0;
+    overflow: auto;
+    background:
+      linear-gradient(var(--line) 1px, transparent 1px) 0 0 / 100% 28px,
+      var(--bg);
+    background-attachment: local;
+    display: flex;
+    justify-content: center;
+    padding: 40px 32px 64px;
+  }
+  .stage-inner { flex: none; }
+  .page-wrap {
+    position: relative;
+    box-shadow: var(--shadow);
+    background: #fff;
+    line-height: 0;
+  }
+  .page-wrap canvas#pageCanvas { display: block; }
+  .page-wrap canvas#scratchCanvas {
+    position: absolute; left: 0; top: 0;
+    pointer-events: none;
+  }
+  .overlay {
+    position: absolute; left: 0; top: 0;
+    pointer-events: none;
+  }
+  .stage[data-tool="text"] .overlay { cursor: text; pointer-events: auto; }
+  .stage[data-tool="draw"] .overlay { cursor: crosshair; pointer-events: auto; }
+  .stage[data-tool="highlight"] .overlay,
+  .stage[data-tool="whiteout"] .overlay,
+  .stage[data-tool="rect"] .overlay { cursor: crosshair; pointer-events: auto; }
+  .stage[data-tool="image"] .overlay,
+  .stage[data-tool="signature"] .overlay { cursor: copy; pointer-events: auto; }
+
+  .text-editor {
+    position: absolute;
+    resize: none;
+    border: 1.5px dashed var(--accent);
+    background: rgba(255,255,255,0.86);
+    padding: 2px 4px;
+    min-width: 140px;
+    line-height: 1.3;
+    outline: none;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  /* ---------- Toast ---------- */
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: 22px;
+    transform: translate(-50%, 8px);
+    background: var(--ink);
+    color: var(--bg);
+    font-size: 13px;
+    padding: 10px 16px;
+    border-radius: 9px;
+    box-shadow: var(--shadow);
+    opacity: 0;
+    transition: opacity 160ms ease, transform 160ms ease;
+    z-index: 100;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+  .toast.error { background: var(--danger); color: #fff; }
+  @media (prefers-reduced-motion: reduce) {
+    .toast { transition: none; }
+  }
+
+  .lib-error[hidden] { display: none; }
+  .lib-error {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 14px;
+    text-align: center;
+    padding: 24px;
+    z-index: 200;
+  }
+  .lib-error div { max-width: 360px; }
+  .lib-error strong { display: block; margin-bottom: 6px; font-size: 16px; }
+
+  /* ---------- Responsive ---------- */
+  @media (max-width: 760px) {
+    .toolbar {
+      height: auto;
+      flex-wrap: wrap;
+      row-gap: 8px;
+      padding: 8px 10px;
+    }
+    .file-controls { flex: 1 1 100%; order: 1; }
+    .tool-group { order: 2; }
+    .right-controls {
+      order: 3;
+      flex: 1 1 100%;
+      margin-left: 0;
+      justify-content: center;
+    }
+    .rail-toggle { display: inline-flex; }
+    .divider.wide-only { display: none; }
+    .rail-pages, .rail-props {
+      position: absolute;
+      top: 0; bottom: 0;
+      width: 240px;
+      z-index: 30;
+      transition: transform 180ms ease;
+      box-shadow: var(--shadow);
+    }
+    .rail-pages { left: 0; transform: translateX(-100%); }
+    .rail-props { right: 0; transform: translateX(100%); }
+    .rail-pages.open, .rail-props.open { transform: translateX(0); }
+    .rail-backdrop {
+      display: none;
+      position: absolute; inset: 0;
+      background: rgba(0,0,0,0.28);
+      z-index: 25;
+    }
+    .rail-backdrop.show { display: block; }
+    .page-badge { display: none; }
+    .filename-field { max-width: 40vw; }
+    #filenameInput { max-width: 140px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .rail-pages, .rail-props { transition: none; }
+  }
+</style>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+<div class="app" id="app">
+  <header class="toolbar">
+    <div class="brand" title="Quire">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 6.5c3-1.6 6-1.6 8 0 2-1.6 5-1.6 8 0v11c-3-1.6-6-1.6-8 0-2-1.6-5-1.6-8 0z"/>
+        <path d="M12 6.5v11"/>
+      </svg>
+      <span class="brand-name">Quire</span>
+    </div>
+    <div class="divider wide-only"></div>
+    <div class="file-controls">
+      <button class="icon-btn rail-toggle" id="toggleLeftRail" title="Pages" aria-label="Show pages">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="6" height="16" rx="1"/><rect x="13" y="4" width="7" height="16" rx="1"/></svg>
+      </button>
+      <div class="filename-field">
+        <input id="filenameInput" value="sample-delivery-notice" spellcheck="false" aria-label="File name">
+        <span class="ext-label">.pdf</span>
+      </div>
+      <span class="page-badge" id="pageBadge">1 page</span>
+    </div>
+
+    <div class="tool-group" role="group" aria-label="Tools">
+      <button class="icon-btn active" id="toolSelect" data-tool="select" title="Select" aria-label="Select tool">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3l6.5 16 2-6.5L20 10.5z"/></svg>
+      </button>
+      <button class="icon-btn" id="toolText" data-tool="text" title="Add text" aria-label="Text tool">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5h14M12 5v14"/></svg>
+      </button>
+      <button class="icon-btn" id="toolDraw" data-tool="draw" title="Draw" aria-label="Draw tool">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l1-4.5L15.5 5 19 8.5 8.5 19z"/><path d="M13 7l4 4"/></svg>
+      </button>
+      <button class="icon-btn" id="toolHighlight" data-tool="highlight" title="Highlight" aria-label="Highlight tool">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 14l6-9 5 3.5-6.5 9z"/><path d="M8.5 16.5L5 20H3l1-3.5z"/></svg>
+      </button>
+      <button class="icon-btn" id="toolWhiteout" data-tool="whiteout" title="White-out" aria-label="White-out tool">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15l8-8 7 7-6 6H8z"/><path d="M10 20H4"/></svg>
+      </button>
+      <button class="icon-btn" id="toolRect" data-tool="rect" title="Rectangle" aria-label="Rectangle tool">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="6" width="16" height="12" rx="1.5"/></svg>
+      </button>
+      <button class="icon-btn" id="toolImage" data-tool="image" title="Add image" aria-label="Image tool">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="1.5"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg>
+      </button>
+      <button class="icon-btn" id="toolSignature" data-tool="signature" title="Signature" aria-label="Signature tool">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17c2-1 3-3 3.5-5C7 9.5 8 8 9 8.5c1 .5.5 3-.5 4.5-1 1.5-.5 2.5.8 2 1.6-.6 2.2-2.8 3.4-2.8 1 0 .6 1.8 1.8 1.8 1 0 2-1 3-2"/><path d="M4 20h16"/></svg>
+      </button>
+    </div>
+
+    <div class="right-controls">
+      <button class="icon-btn" id="undoBtn" title="Undo" aria-label="Undo last change" disabled>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7L3 11l4 4"/><path d="M3 11h11a6 6 0 010 12h-2"/></svg>
+      </button>
+      <div class="zoom-control">
+        <button class="icon-btn" id="zoomOut" aria-label="Zoom out">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/></svg>
+        </button>
+        <span class="zoom-readout" id="zoomReadout">100%</span>
+        <button class="icon-btn" id="zoomIn" aria-label="Zoom in">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </div>
+      <button class="icon-btn rail-toggle" id="toggleRightRail" title="Tool options" aria-label="Show tool options">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1-1.6 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9a1.7 1.7 0 001.5 1h.1a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>
+      </button>
+      <button class="btn btn-primary" id="downloadBtn">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13m0 0l-4.5-4.5M12 16l4.5-4.5"/><path d="M4 19h16"/></svg>
+        Download PDF
+      </button>
+    </div>
+  </header>
+
+  <div class="page-nav">
+    <button class="icon-btn" id="prevPageBtn" aria-label="Previous page">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+    </button>
+    <div class="page-nav-counter">
+      Page <input type="number" id="pageNumInput" min="1" value="1" aria-label="Page number"> <span id="pageNavTotal">/ 1</span>
+    </div>
+    <button class="icon-btn" id="nextPageBtn" aria-label="Next page">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+    </button>
+    <div class="divider"></div>
+    <button class="btn" id="fitBtn" style="padding:6px 12px;">Fit page</button>
+  </div>
+
+  <div class="workspace">
+    <div class="rail-backdrop" id="railBackdrop"></div>
+
+    <aside class="rail rail-pages" id="railPages">
+      <div class="rail-head">Pages</div>
+      <div class="rail-scroll" id="pagesList"></div>
+      <div class="rail-foot">
+        <select class="num-input" id="newPageSize" style="width:100%" aria-label="New page size">
+          <option value="Letter">Letter</option>
+          <option value="A4">A4</option>
+        </select>
+        <button class="btn" id="addPageBtn" style="width:100%; justify-content:center;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          Add page
+        </button>
+        <button class="btn" id="mergeBtn" style="width:100%; justify-content:center;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4v9a3 3 0 003 3h5"/><path d="M13 13l3 3-3 3"/><rect x="3" y="4" width="5" height="6" rx="1"/></svg>
+          Merge PDF&hellip;
+        </button>
+        <button class="btn" id="openBtn" style="width:100%; justify-content:center;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7a2 2 0 012-2h3l2 2h7a2 2 0 012 2v7a2 2 0 01-2 2H6a2 2 0 01-2-2z"/></svg>
+          Open PDF&hellip;
+        </button>
+      </div>
+    </aside>
+
+    <main class="stage" id="stage" data-tool="select">
+      <div class="stage-inner">
+        <div class="page-wrap" id="pageWrap">
+          <canvas id="pageCanvas"></canvas>
+          <canvas id="scratchCanvas"></canvas>
+          <div class="overlay" id="overlay"></div>
+        </div>
+      </div>
+    </main>
+
+    <aside class="rail rail-props" id="railProps">
+      <div class="rail-head">Options</div>
+      <div class="rail-scroll" id="propsBody"></div>
+    </aside>
+  </div>
+</div>
+
+<input type="file" id="fileOpen" accept="application/pdf" hidden>
+<input type="file" id="fileMerge" accept="application/pdf" hidden>
+<input type="file" id="imageFileInput" accept="image/png,image/jpeg" hidden>
+<input type="file" id="signatureFileInput" accept="image/png,image/jpeg" hidden>
+<div class="toast" id="toast" hidden></div>
+<div class="lib-error" id="libError" hidden>
+  <div>
+    <strong>Quire couldn&rsquo;t load</strong>
+    Its PDF engine didn&rsquo;t load &mdash; check your connection and reload the page.
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  if (typeof window.PDFLib === "undefined" || typeof window.pdfjsLib === "undefined") {
+    document.getElementById("libError").hidden = false;
+    return;
+  }
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+  var PAGE_SIZES = { Letter: [612, 792], A4: [595.28, 841.89] };
+
+  var state = {
+    workingBytes: null,
+    pdfjsDoc: null,
+    activePageIndex: 0,
+    zoom: 1,
+    tool: "select",
+    textFont: "sans",
+    textSize: 14,
+    textColor: "#182333",
+    drawColor: "#2952CC",
+    drawWidth: 2,
+    highlightColor: "#F0A93B",
+    rectColor: "#2952CC",
+    rectWidth: 2,
+    pendingImage: null,
+    imageScalePercent: 30,
+    pendingSignature: null,
+    signatureScalePercent: 22,
+    currentViewport: null
+  };
+  var history = [];
+
+  var el = {
+    filenameInput: document.getElementById("filenameInput"),
+    pageBadge: document.getElementById("pageBadge"),
+    pagesList: document.getElementById("pagesList"),
+    stage: document.getElementById("stage"),
+    pageCanvas: document.getElementById("pageCanvas"),
+    scratchCanvas: document.getElementById("scratchCanvas"),
+    overlay: document.getElementById("overlay"),
+    propsBody: document.getElementById("propsBody"),
+    toast: document.getElementById("toast"),
+    zoomReadout: document.getElementById("zoomReadout"),
+    undoBtn: document.getElementById("undoBtn"),
+    railPages: document.getElementById("railPages"),
+    railProps: document.getElementById("railProps"),
+    railBackdrop: document.getElementById("railBackdrop"),
+    pageNumInput: document.getElementById("pageNumInput"),
+    pageNavTotal: document.getElementById("pageNavTotal"),
+    imageFileInput: document.getElementById("imageFileInput"),
+    signatureFileInput: document.getElementById("signatureFileInput")
+  };
+
+  /* ---------------- helpers ---------------- */
+
+  function rgbFromHex(hex) {
+    var h = hex.replace("#", "");
+    var r = parseInt(h.substring(0, 2), 16) / 255;
+    var g = parseInt(h.substring(2, 4), 16) / 255;
+    var b = parseInt(h.substring(4, 6), 16) / 255;
+    return PDFLib.rgb(r, g, b);
+  }
+
+  function fontForKey(key) {
+    if (key === "serif") return PDFLib.StandardFonts.TimesRoman;
+    if (key === "mono") return PDFLib.StandardFonts.Courier;
+    return PDFLib.StandardFonts.Helvetica;
+  }
+
+  function screenToPdf(viewport, sx, sy) {
+    var t = viewport.transform;
+    var a = t[0], b = t[1], c = t[2], d = t[3], e = t[4], f = t[5];
+    var det = a * d - b * c;
+    var px = (d * (sx - e) - c * (sy - f)) / det;
+    var py = (a * (sy - f) - b * (sx - e)) / det;
+    return [px, py];
+  }
+
+  function sanitizeStem(s) {
+    var out = (s || "").trim().replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, " ").slice(0, 80);
+    return out || "document";
+  }
+
+  var toastTimer;
+  function showToast(msg, isError) {
+    el.toast.textContent = msg;
+    el.toast.classList.toggle("error", !!isError);
+    el.toast.hidden = false;
+    requestAnimationFrame(function () { el.toast.classList.add("show"); });
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () {
+      el.toast.classList.remove("show");
+      setTimeout(function () { el.toast.hidden = true; }, 220);
+    }, 2600);
+  }
+
+  function iconSvg(name) {
+    var paths = {
+      rotate: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 1 3 6.7"/><path d="M3 21v-5h5"/></svg>',
+      trash: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2m2 0-1 13H6L5 7"/></svg>'
+    };
+    return paths[name] || "";
+  }
+
+  /* ---------------- document mutation ---------------- */
+
+  function pushHistory() {
+    if (state.workingBytes) {
+      history.push(state.workingBytes.slice(0));
+      if (history.length > 25) history.shift();
+    }
+    el.undoBtn.disabled = history.length === 0;
+  }
+
+  async function undo() {
+    if (!history.length) return;
+    state.workingBytes = history.pop();
+    el.undoBtn.disabled = history.length === 0;
+    await loadIntoViewer();
+  }
+
+  async function mutate(fn) {
+    pushHistory();
+    try {
+      var doc = await PDFLib.PDFDocument.load(state.workingBytes);
+      await fn(doc);
+      state.workingBytes = await doc.save();
+      await loadIntoViewer();
+    } catch (err) {
+      history.pop();
+      el.undoBtn.disabled = history.length === 0;
+      console.error(err);
+      showToast("Something went wrong making that change.", true);
+    }
+  }
+
+  async function loadIntoViewer() {
+    var prevActive = state.activePageIndex;
+    state.pdfjsDoc = await pdfjsLib.getDocument({ data: state.workingBytes.slice(0) }).promise;
+    var n = state.pdfjsDoc.numPages;
+    state.activePageIndex = Math.max(0, Math.min(prevActive, n - 1));
+    el.pageBadge.textContent = n + (n === 1 ? " page" : " pages");
+    updatePageNav();
+    await renderThumbnails();
+    await renderActivePage();
+    renderProps();
+  }
+
+  function updatePageNav() {
+    if (!state.pdfjsDoc) return;
+    el.pageNumInput.value = state.activePageIndex + 1;
+    el.pageNavTotal.textContent = "/ " + state.pdfjsDoc.numPages;
+  }
+
+  function goToPage(i) {
+    if (!state.pdfjsDoc) return;
+    var n = state.pdfjsDoc.numPages;
+    state.activePageIndex = Math.max(0, Math.min(i, n - 1));
+    updatePageNav();
+    renderThumbnails();
+    renderActivePage();
+    renderProps();
+  }
+
+  /* ---------------- rendering ---------------- */
+
+  async function renderActivePage() {
+    if (!state.pdfjsDoc) return;
+    var page = await state.pdfjsDoc.getPage(state.activePageIndex + 1);
+    var dpr = window.devicePixelRatio || 1;
+    var viewport = page.getViewport({ scale: state.zoom });
+    state.currentViewport = viewport;
+
+    [el.pageCanvas, el.scratchCanvas].forEach(function (c) {
+      c.width = Math.max(1, Math.floor(viewport.width * dpr));
+      c.height = Math.max(1, Math.floor(viewport.height * dpr));
+      c.style.width = viewport.width + "px";
+      c.style.height = viewport.height + "px";
+      var ctx = c.getContext("2d");
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, viewport.width, viewport.height);
+    });
+    el.overlay.style.width = viewport.width + "px";
+    el.overlay.style.height = viewport.height + "px";
+
+    var ctx = el.pageCanvas.getContext("2d");
+    await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+
+    updatePageInspector(page);
+  }
+
+  async function renderThumbnails() {
+    el.pagesList.innerHTML = "";
+    var n = state.pdfjsDoc.numPages;
+    var dpr = window.devicePixelRatio || 1;
+    var THUMB_W = 132;
+    for (var i = 0; i < n; i++) {
+      (function (i) {
+        var thumb = document.createElement("div");
+        thumb.className = "thumb" + (i === state.activePageIndex ? " active" : "");
+        thumb.draggable = true;
+        thumb.dataset.index = i;
+
+        var wrap = document.createElement("div");
+        wrap.className = "thumb-canvas-wrap";
+        var canvas = document.createElement("canvas");
+        wrap.appendChild(canvas);
+        thumb.appendChild(wrap);
+
+        var foot = document.createElement("div");
+        foot.className = "thumb-foot";
+        var num = document.createElement("span");
+        num.className = "thumb-num";
+        num.textContent = String(i + 1);
+        var actions = document.createElement("span");
+        actions.className = "thumb-actions";
+        var rotateBtn = document.createElement("button");
+        rotateBtn.className = "icon-btn";
+        rotateBtn.title = "Rotate page";
+        rotateBtn.setAttribute("aria-label", "Rotate page " + (i + 1));
+        rotateBtn.innerHTML = iconSvg("rotate");
+        rotateBtn.addEventListener("click", function (e) { e.stopPropagation(); rotatePage(i); });
+        var delBtn = document.createElement("button");
+        delBtn.className = "icon-btn";
+        delBtn.title = "Delete page";
+        delBtn.setAttribute("aria-label", "Delete page " + (i + 1));
+        delBtn.innerHTML = iconSvg("trash");
+        delBtn.disabled = n <= 1;
+        delBtn.addEventListener("click", function (e) { e.stopPropagation(); deletePage(i); });
+        actions.appendChild(rotateBtn);
+        actions.appendChild(delBtn);
+        foot.appendChild(num);
+        foot.appendChild(actions);
+        thumb.appendChild(foot);
+
+        thumb.addEventListener("click", function () { goToPage(i); });
+        thumb.addEventListener("dragstart", function (e) {
+          e.dataTransfer.setData("text/plain", String(i));
+          e.dataTransfer.effectAllowed = "move";
+        });
+        thumb.addEventListener("dragover", function (e) { e.preventDefault(); });
+        thumb.addEventListener("drop", function (e) {
+          e.preventDefault();
+          var from = parseInt(e.dataTransfer.getData("text/plain"), 10);
+          if (!isNaN(from) && from !== i) reorderPages(from, i);
+        });
+
+        el.pagesList.appendChild(thumb);
+
+        state.pdfjsDoc.getPage(i + 1).then(function (page) {
+          var vp0 = page.getViewport({ scale: 1 });
+          var s = THUMB_W / vp0.width;
+          var vp = page.getViewport({ scale: s });
+          canvas.width = Math.max(1, Math.floor(vp.width * dpr));
+          canvas.height = Math.max(1, Math.floor(vp.height * dpr));
+          canvas.style.width = vp.width + "px";
+          canvas.style.height = vp.height + "px";
+          var ctx = canvas.getContext("2d");
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          return page.render({ canvasContext: ctx, viewport: vp }).promise;
+        }).catch(function (err) { console.error(err); });
+      })(i);
+    }
+  }
+
+  function stdSizeLabel(w, h) {
+    function close(a, b) { return Math.abs(a - b) < 2; }
+    if (close(w, 612) && close(h, 792)) return "Letter";
+    if (close(w, 595.28) && close(h, 841.89)) return "A4";
+    if (close(w, 612) && close(h, 1008)) return "Legal";
+    return "Custom";
+  }
+
+  function updatePageInspector(page) {
+    var view = page.view;
+    var w = view[2] - view[0], h = view[3] - view[1];
+    state.pageInfo = {
+      widthPt: Math.round(w),
+      heightPt: Math.round(h),
+      widthIn: (w / 72).toFixed(2),
+      heightIn: (h / 72).toFixed(2),
+      rotation: page.rotate,
+      sizeName: stdSizeLabel(w, h)
+    };
+    if (state.tool === "select") renderProps();
+  }
+
+  /* ---------------- page operations ---------------- */
+
+  function rotatePage(i) {
+    mutate(function (doc) {
+      var page = doc.getPage(i);
+      var cur = (page.getRotation() && page.getRotation().angle) || 0;
+      page.setRotation(PDFLib.degrees((cur + 90) % 360));
+    });
+  }
+
+  function deletePage(i) {
+    if (state.pdfjsDoc.numPages <= 1) return;
+    mutate(function (doc) { doc.removePage(i); });
+  }
+
+  function addPage(sizeKey) {
+    var size = PAGE_SIZES[sizeKey] || PAGE_SIZES.Letter;
+    var at = state.activePageIndex + 1;
+    mutate(function (doc) { doc.insertPage(at, size); }).then(function () {
+      state.activePageIndex = at;
+      updatePageNav();
+      renderThumbnails();
+      renderActivePage();
+    });
+  }
+
+  async function reorderPages(from, to) {
+    pushHistory();
+    try {
+      var doc = await PDFLib.PDFDocument.load(state.workingBytes);
+      var n = doc.getPageCount();
+      var order = [];
+      for (var i = 0; i < n; i++) order.push(i);
+      var moved = order.splice(from, 1)[0];
+      order.splice(to, 0, moved);
+      var newDoc = await PDFLib.PDFDocument.create();
+      var copied = await newDoc.copyPages(doc, order);
+      copied.forEach(function (p) { newDoc.addPage(p); });
+      state.workingBytes = await newDoc.save();
+      state.activePageIndex = to;
+      await loadIntoViewer();
+    } catch (err) {
+      history.pop();
+      el.undoBtn.disabled = history.length === 0;
+      console.error(err);
+      showToast("Something went wrong reordering that page.", true);
+    }
+  }
+
+  async function mergeFile(file) {
+    try {
+      var bytes = new Uint8Array(await file.arrayBuffer());
+      await mutate(async function (doc) {
+        var other = await PDFLib.PDFDocument.load(bytes, { ignoreEncryption: true });
+        var copied = await doc.copyPages(other, other.getPageIndices());
+        copied.forEach(function (p) { doc.addPage(p); });
+      });
+      showToast("Merged " + file.name);
+    } catch (err) {
+      console.error(err);
+      showToast("Couldn't merge that file — it may be corrupted or encrypted.", true);
+    }
+  }
+
+  async function openFile(file) {
+    try {
+      var bytes = new Uint8Array(await file.arrayBuffer());
+      var doc = await PDFLib.PDFDocument.load(bytes, { ignoreEncryption: true });
+      history = [];
+      el.undoBtn.disabled = true;
+      state.workingBytes = await doc.save();
+      state.activePageIndex = 0;
+      var stem = file.name.replace(/\.pdf$/i, "");
+      el.filenameInput.value = sanitizeStem(stem);
+      await loadIntoViewer();
+      showToast("Opened " + file.name);
+    } catch (err) {
+      console.error(err);
+      showToast("Couldn't open that file — it may be corrupted or encrypted.", true);
+    }
+  }
+
+  /* ---------------- text tool ---------------- */
+
+  var activeEditor = null;
+
+  function spawnTextEditor(sx, sy, pdfX, pdfY) {
+    commitOrDiscardEditor(false);
+    var ta = document.createElement("textarea");
+    ta.className = "text-editor";
+    ta.style.left = sx + "px";
+    ta.style.top = (sy - state.textSize * state.zoom * 0.85) + "px";
+    ta.style.fontSize = (state.textSize * state.zoom) + "px";
+    ta.style.color = state.textColor;
+    ta.style.fontFamily = state.textFont === "serif" ? "Georgia, serif" : state.textFont === "mono" ? "var(--font-mono)" : "var(--font-ui)";
+    ta.rows = 1;
+    ta.dataset.pdfX = pdfX;
+    ta.dataset.pdfY = pdfY;
+    el.overlay.appendChild(ta);
+    ta.focus();
+    ta.addEventListener("input", function () {
+      ta.style.height = "auto";
+      ta.style.height = ta.scrollHeight + "px";
+    });
+    ta.addEventListener("blur", function () { commitOrDiscardEditor(true); });
+    ta.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") { e.preventDefault(); commitOrDiscardEditor(false); }
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ta.blur(); }
+    });
+    activeEditor = ta;
+  }
+
+  function commitOrDiscardEditor(shouldCommit) {
+    var ta = activeEditor;
+    if (!ta) return;
+    activeEditor = null;
+    var value = ta.value;
+    var pdfX = parseFloat(ta.dataset.pdfX);
+    var pdfY = parseFloat(ta.dataset.pdfY);
+    ta.remove();
+    if (!shouldCommit || !value.trim()) return;
+    var sizePt = state.textSize;
+    var fontKey = state.textFont;
+    var color = state.textColor;
+    var pageIndex = state.activePageIndex;
+    mutate(async function (doc) {
+      var page = doc.getPage(pageIndex);
+      var font = await doc.embedFont(fontForKey(fontKey));
+      var lines = value.split("\n");
+      var baseline = pdfY - sizePt * 0.85;
+      for (var i = 0; i < lines.length; i++) {
+        if (lines[i].length) page.drawText(lines[i], { x: pdfX, y: baseline, size: sizePt, font: font, color: rgbFromHex(color) });
+        baseline -= sizePt * 1.3;
+      }
+    });
+  }
+
+  /* ---------------- draw / highlight tools ---------------- */
+
+  var pointerActive = false;
+  var drawPoints = [];
+  var highlightStart = null, highlightEnd = null;
+
+  function getLocal(e) {
+    var rect = el.overlay.getBoundingClientRect();
+    return [e.clientX - rect.left, e.clientY - rect.top];
+  }
+
+  function clearScratch() {
+    var ctx = el.scratchCanvas.getContext("2d");
+    ctx.clearRect(0, 0, el.scratchCanvas.width, el.scratchCanvas.height);
+  }
+
+  function drawScratchStroke() {
+    clearScratch();
+    var ctx = el.scratchCanvas.getContext("2d");
+    ctx.strokeStyle = state.drawColor;
+    ctx.lineWidth = state.drawWidth * state.zoom;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    drawPoints.forEach(function (p, i) { i === 0 ? ctx.moveTo(p[0], p[1]) : ctx.lineTo(p[0], p[1]); });
+    ctx.stroke();
+  }
+
+  var DRAG_RECT_TOOLS = { highlight: 1, whiteout: 1, rect: 1 };
+
+  function drawScratchRect() {
+    clearScratch();
+    var ctx = el.scratchCanvas.getContext("2d");
+    var x = Math.min(highlightStart[0], highlightEnd[0]);
+    var y = Math.min(highlightStart[1], highlightEnd[1]);
+    var w = Math.abs(highlightEnd[0] - highlightStart[0]);
+    var h = Math.abs(highlightEnd[1] - highlightStart[1]);
+    if (state.tool === "whiteout") {
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(x, y, w, h);
+      ctx.strokeStyle = "rgba(24,35,51,0.35)";
+      ctx.setLineDash([4, 3]);
+      ctx.strokeRect(x + 0.5, y + 0.5, Math.max(0, w - 1), Math.max(0, h - 1));
+      ctx.setLineDash([]);
+    } else if (state.tool === "rect") {
+      ctx.strokeStyle = state.rectColor;
+      ctx.lineWidth = state.rectWidth * state.zoom;
+      ctx.strokeRect(x, y, w, h);
+    } else {
+      ctx.fillStyle = state.highlightColor;
+      ctx.globalAlpha = 0.35;
+      ctx.fillRect(x, y, w, h);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  async function placeAsset(kind, sx, sy) {
+    var asset = kind === "image" ? state.pendingImage : state.pendingSignature;
+    if (!asset) {
+      showToast("Choose " + (kind === "image" ? "an image" : "a signature image") + " first.", true);
+      return;
+    }
+    var pdf = screenToPdf(state.currentViewport, sx, sy);
+    var percent = kind === "image" ? state.imageScalePercent : state.signatureScalePercent;
+    var pageIndex = state.activePageIndex;
+    var pageWidthPt = state.pageInfo ? state.pageInfo.widthPt : 612;
+    await mutate(async function (doc) {
+      var embedded = asset.kind === "png" ? await doc.embedPng(asset.bytes) : await doc.embedJpg(asset.bytes);
+      var targetWidth = pageWidthPt * (percent / 100);
+      var scaleFactor = targetWidth / embedded.width;
+      var dims = embedded.scale(scaleFactor);
+      var page = doc.getPage(pageIndex);
+      page.drawImage(embedded, { x: pdf[0] - dims.width / 2, y: pdf[1] - dims.height / 2, width: dims.width, height: dims.height });
+    });
+  }
+
+  el.overlay.addEventListener("pointerdown", function (e) {
+    if (state.tool === "text") {
+      var p = getLocal(e);
+      var pdf = screenToPdf(state.currentViewport, p[0], p[1]);
+      spawnTextEditor(p[0], p[1], pdf[0], pdf[1]);
+      return;
+    }
+    if (state.tool === "image" || state.tool === "signature") {
+      var p2 = getLocal(e);
+      placeAsset(state.tool, p2[0], p2[1]);
+      return;
+    }
+    if (state.tool === "draw") {
+      pointerActive = true;
+      drawPoints = [getLocal(e)];
+      el.overlay.setPointerCapture(e.pointerId);
+    } else if (DRAG_RECT_TOOLS[state.tool]) {
+      pointerActive = true;
+      highlightStart = getLocal(e);
+      highlightEnd = highlightStart;
+      el.overlay.setPointerCapture(e.pointerId);
+    }
+  });
+
+  el.overlay.addEventListener("pointermove", function (e) {
+    if (!pointerActive) return;
+    if (state.tool === "draw") {
+      drawPoints.push(getLocal(e));
+      drawScratchStroke();
+    } else if (DRAG_RECT_TOOLS[state.tool]) {
+      highlightEnd = getLocal(e);
+      drawScratchRect();
+    }
+  });
+
+  el.overlay.addEventListener("pointerup", async function () {
+    if (!pointerActive) return;
+    pointerActive = false;
+    if (state.tool === "draw") {
+      var pts = drawPoints.map(function (p) { return screenToPdf(state.currentViewport, p[0], p[1]); });
+      clearScratch();
+      if (pts.length < 2) return;
+      var color = state.drawColor, width = state.drawWidth, pageIndex = state.activePageIndex;
+      await mutate(function (doc) {
+        var page = doc.getPage(pageIndex);
+        for (var i = 0; i < pts.length - 1; i++) {
+          page.drawLine({
+            start: { x: pts[i][0], y: pts[i][1] },
+            end: { x: pts[i + 1][0], y: pts[i + 1][1] },
+            thickness: width,
+            color: rgbFromHex(color)
+          });
+        }
+      });
+    } else if (DRAG_RECT_TOOLS[state.tool]) {
+      var a = screenToPdf(state.currentViewport, highlightStart[0], highlightStart[1]);
+      var b = screenToPdf(state.currentViewport, highlightEnd[0], highlightEnd[1]);
+      clearScratch();
+      var x = Math.min(a[0], b[0]), y = Math.min(a[1], b[1]);
+      var w = Math.abs(b[0] - a[0]), h = Math.abs(b[1] - a[1]);
+      if (w < 2 || h < 2) return;
+      var tool = state.tool, pageIndex2 = state.activePageIndex;
+      var hlColor = state.highlightColor, rColor = state.rectColor, rWidth = state.rectWidth;
+      await mutate(function (doc) {
+        var page = doc.getPage(pageIndex2);
+        if (tool === "whiteout") {
+          page.drawRectangle({ x: x, y: y, width: w, height: h, color: PDFLib.rgb(1, 1, 1), opacity: 1 });
+        } else if (tool === "rect") {
+          page.drawRectangle({ x: x, y: y, width: w, height: h, borderColor: rgbFromHex(rColor), borderWidth: rWidth });
+        } else {
+          page.drawRectangle({ x: x, y: y, width: w, height: h, color: rgbFromHex(hlColor), opacity: 0.35 });
+        }
+      });
+    }
+  });
+
+  /* ---------------- props rail ---------------- */
+
+  function colorSwatchesHtml(name, colors, activeColor) {
+    var html = '<div class="swatches">';
+    colors.forEach(function (c) {
+      html += '<button class="swatch' + (c.toLowerCase() === activeColor.toLowerCase() ? " active" : "") + '" data-name="' + name + '" data-color="' + c + '" style="background:' + c + '" aria-label="' + c + '"></button>';
+    });
+    html += '<label class="swatch-custom" title="Custom color"><input type="color" data-name="' + name + '" value="' + activeColor + '"></label>';
+    html += '</div>';
+    return html;
+  }
+
+  function renderProps() {
+    var body = el.propsBody;
+    if (state.tool === "text") {
+      body.innerHTML =
+        '<div class="field"><span class="field-label">Font</span>' +
+        '<div class="seg" id="fontSeg">' +
+          '<button data-v="sans" class="' + (state.textFont === "sans" ? "active" : "") + '">Sans</button>' +
+          '<button data-v="serif" class="' + (state.textFont === "serif" ? "active" : "") + '">Serif</button>' +
+          '<button data-v="mono" class="' + (state.textFont === "mono" ? "active" : "") + '">Mono</button>' +
+        '</div></div>' +
+        '<div class="field"><span class="field-label">Size</span>' +
+        '<div class="num-input-row"><input type="range" id="textSizeRange" min="8" max="72" value="' + state.textSize + '">' +
+        '<span class="num-input" id="textSizeReadout">' + state.textSize + 'pt</span></div></div>' +
+        '<div class="field"><span class="field-label">Color</span>' + colorSwatchesHtml("textColor", ["#182333", "#2952CC", "#C43D3D", "#2E7D5B"], state.textColor) + '</div>' +
+        '<p class="hint">Click the page to drop a text box. Press Enter or click away to place it.</p>';
+
+      document.getElementById("fontSeg").querySelectorAll("button").forEach(function (b) {
+        b.addEventListener("click", function () { state.textFont = b.dataset.v; renderProps(); });
+      });
+      document.getElementById("textSizeRange").addEventListener("input", function (e) {
+        state.textSize = parseInt(e.target.value, 10);
+        document.getElementById("textSizeReadout").textContent = state.textSize + "pt";
+      });
+      bindSwatches();
+    } else if (state.tool === "draw") {
+      body.innerHTML =
+        '<div class="field"><span class="field-label">Color</span>' + colorSwatchesHtml("drawColor", ["#182333", "#2952CC", "#C43D3D", "#2E7D5B"], state.drawColor) + '</div>' +
+        '<div class="field"><span class="field-label">Stroke width</span>' +
+        '<div class="num-input-row"><input type="range" id="drawWidthRange" min="1" max="8" value="' + state.drawWidth + '">' +
+        '<span class="num-input" id="drawWidthReadout">' + state.drawWidth + 'pt</span></div></div>' +
+        '<p class="hint">Drag on the page to draw. Release to place the stroke.</p>';
+      document.getElementById("drawWidthRange").addEventListener("input", function (e) {
+        state.drawWidth = parseInt(e.target.value, 10);
+        document.getElementById("drawWidthReadout").textContent = state.drawWidth + "pt";
+      });
+      bindSwatches();
+    } else if (state.tool === "highlight") {
+      body.innerHTML =
+        '<div class="field"><span class="field-label">Color</span>' + colorSwatchesHtml("highlightColor", ["#F0A93B", "#9FD98C", "#F2A6C5"], state.highlightColor) + '</div>' +
+        '<p class="hint">Drag over text to mark it, like a real highlighter.</p>';
+      bindSwatches();
+    } else if (state.tool === "whiteout") {
+      body.innerHTML = '<p class="hint">Drag over content on the page to cover it with a solid white rectangle.</p>';
+    } else if (state.tool === "rect") {
+      body.innerHTML =
+        '<div class="field"><span class="field-label">Border color</span>' + colorSwatchesHtml("rectColor", ["#182333", "#2952CC", "#C43D3D", "#2E7D5B"], state.rectColor) + '</div>' +
+        '<div class="field"><span class="field-label">Line width</span>' +
+        '<div class="num-input-row"><input type="range" id="rectWidthRange" min="1" max="10" value="' + state.rectWidth + '">' +
+        '<span class="num-input" id="rectWidthReadout">' + state.rectWidth + 'pt</span></div></div>' +
+        '<p class="hint">Drag on the page to draw a rectangle.</p>';
+      document.getElementById("rectWidthRange").addEventListener("input", function (e) {
+        state.rectWidth = parseInt(e.target.value, 10);
+        document.getElementById("rectWidthReadout").textContent = state.rectWidth + "pt";
+      });
+      bindSwatches();
+    } else if (state.tool === "image" || state.tool === "signature") {
+      var isSig = state.tool === "signature";
+      var asset = isSig ? state.pendingSignature : state.pendingImage;
+      var percent = isSig ? state.signatureScalePercent : state.imageScalePercent;
+      body.innerHTML =
+        '<div class="field"><span class="field-label">' + (isSig ? "Signature image" : "Image") + '</span>' +
+        '<button class="btn" id="pickAssetBtn" style="width:100%; justify-content:center;">Choose ' + (isSig ? "signature" : "image") + '</button>' +
+        '<div class="upload-status">' + (asset ? asset.name : "No " + (isSig ? "signature" : "image") + " loaded.") + '</div></div>' +
+        '<div class="field"><span class="field-label">Width on page</span>' +
+        '<div class="num-input-row"><input type="range" id="assetScaleRange" min="10" max="80" value="' + percent + '">' +
+        '<span class="num-input" id="assetScaleReadout">' + percent + '%</span></div></div>' +
+        '<p class="hint">' + (isSig ? "Transparent PNG works best. " : "") + 'Then click the page to place it.</p>';
+      document.getElementById("pickAssetBtn").addEventListener("click", function () {
+        (isSig ? el.signatureFileInput : el.imageFileInput).click();
+      });
+      document.getElementById("assetScaleRange").addEventListener("input", function (e) {
+        var v = parseInt(e.target.value, 10);
+        if (isSig) state.signatureScalePercent = v; else state.imageScalePercent = v;
+        document.getElementById("assetScaleReadout").textContent = v + "%";
+      });
+    } else {
+      var info = state.pageInfo;
+      if (!info) { body.innerHTML = '<p class="props-empty">Select a page to see its details.</p>'; return; }
+      body.innerHTML =
+        '<dl class="kv-list">' +
+        '<div class="kv"><dt>Page</dt><dd>' + (state.activePageIndex + 1) + ' of ' + state.pdfjsDoc.numPages + '</dd></div>' +
+        '<div class="kv"><dt>Size</dt><dd>' + info.sizeName + '</dd></div>' +
+        '<div class="kv"><dt>Dimensions</dt><dd>' + info.widthIn + '″ × ' + info.heightIn + '″</dd></div>' +
+        '<div class="kv"><dt>Points</dt><dd>' + info.widthPt + ' × ' + info.heightPt + '</dd></div>' +
+        '<div class="kv"><dt>Rotation</dt><dd>' + info.rotation + '°</dd></div>' +
+        '</dl>' +
+        '<div class="stack-gap" style="margin-top:8px">' +
+        '<button class="btn" id="propRotate" style="justify-content:center">Rotate page</button>' +
+        '<button class="btn" id="propDelete" style="justify-content:center; color:var(--danger); border-color:var(--danger-soft)" ' + (state.pdfjsDoc.numPages <= 1 ? "disabled" : "") + '>Delete page</button>' +
+        '</div>' +
+        '<p class="hint">Pick a tool above to add text, draw, highlight, white-out, a shape, an image, or a signature.</p>';
+      document.getElementById("propRotate").addEventListener("click", function () { rotatePage(state.activePageIndex); });
+      var delBtn = document.getElementById("propDelete");
+      if (delBtn) delBtn.addEventListener("click", function () { deletePage(state.activePageIndex); });
+    }
+  }
+
+  function bindSwatches() {
+    el.propsBody.querySelectorAll(".swatch").forEach(function (sw) {
+      sw.addEventListener("click", function () {
+        state[sw.dataset.name] = sw.dataset.color;
+        renderProps();
+      });
+    });
+    el.propsBody.querySelectorAll('input[type="color"]').forEach(function (inp) {
+      inp.addEventListener("input", function () {
+        state[inp.dataset.name] = inp.value;
+      });
+      inp.addEventListener("change", function () { renderProps(); });
+    });
+  }
+
+  /* ---------------- toolbar wiring ---------------- */
+
+  function setTool(tool) {
+    state.tool = tool;
+    document.querySelectorAll(".tool-group .icon-btn").forEach(function (b) {
+      b.classList.toggle("active", b.dataset.tool === tool);
+    });
+    el.stage.dataset.tool = tool;
+    renderProps();
+  }
+
+  document.getElementById("toolSelect").addEventListener("click", function () { setTool("select"); });
+  document.getElementById("toolText").addEventListener("click", function () { setTool("text"); });
+  document.getElementById("toolDraw").addEventListener("click", function () { setTool("draw"); });
+  document.getElementById("toolHighlight").addEventListener("click", function () { setTool("highlight"); });
+  document.getElementById("toolWhiteout").addEventListener("click", function () { setTool("whiteout"); });
+  document.getElementById("toolRect").addEventListener("click", function () { setTool("rect"); });
+  document.getElementById("toolImage").addEventListener("click", function () { setTool("image"); });
+  document.getElementById("toolSignature").addEventListener("click", function () { setTool("signature"); });
+
+  document.getElementById("prevPageBtn").addEventListener("click", function () { goToPage(state.activePageIndex - 1); });
+  document.getElementById("nextPageBtn").addEventListener("click", function () { goToPage(state.activePageIndex + 1); });
+  el.pageNumInput.addEventListener("change", function () {
+    var v = parseInt(el.pageNumInput.value, 10);
+    if (!isNaN(v)) goToPage(v - 1); else updatePageNav();
+  });
+
+  document.getElementById("fitBtn").addEventListener("click", async function () {
+    if (!state.pdfjsDoc) return;
+    var page = await state.pdfjsDoc.getPage(state.activePageIndex + 1);
+    var vp0 = page.getViewport({ scale: 1 });
+    var availW = el.stage.clientWidth - 64;
+    var availH = el.stage.clientHeight - 104;
+    var s = Math.min(availW / vp0.width, availH / vp0.height);
+    state.zoom = Math.max(0.25, Math.min(3, Math.round(s * 100) / 100));
+    el.zoomReadout.textContent = Math.round(state.zoom * 100) + "%";
+    renderActivePage();
+  });
+
+  async function loadPendingAsset(file, stateKey) {
+    try {
+      var bytes = new Uint8Array(await file.arrayBuffer());
+      var kind = file.type === "image/png" ? "png" : "jpg";
+      state[stateKey] = { bytes: bytes, kind: kind, name: file.name };
+      renderProps();
+    } catch (err) {
+      console.error(err);
+      showToast("Couldn't read that image.", true);
+    }
+  }
+  el.imageFileInput.addEventListener("change", function () {
+    if (el.imageFileInput.files[0]) loadPendingAsset(el.imageFileInput.files[0], "pendingImage");
+    el.imageFileInput.value = "";
+  });
+  el.signatureFileInput.addEventListener("change", function () {
+    if (el.signatureFileInput.files[0]) loadPendingAsset(el.signatureFileInput.files[0], "pendingSignature");
+    el.signatureFileInput.value = "";
+  });
+
+  document.getElementById("zoomIn").addEventListener("click", function () {
+    state.zoom = Math.min(3, Math.round((state.zoom + 0.1) * 100) / 100);
+    el.zoomReadout.textContent = Math.round(state.zoom * 100) + "%";
+    renderActivePage();
+  });
+  document.getElementById("zoomOut").addEventListener("click", function () {
+    state.zoom = Math.max(0.25, Math.round((state.zoom - 0.1) * 100) / 100);
+    el.zoomReadout.textContent = Math.round(state.zoom * 100) + "%";
+    renderActivePage();
+  });
+
+  document.getElementById("undoBtn").addEventListener("click", undo);
+
+  document.getElementById("addPageBtn").addEventListener("click", function () {
+    addPage(document.getElementById("newPageSize").value);
+  });
+
+  var fileMerge = document.getElementById("fileMerge");
+  document.getElementById("mergeBtn").addEventListener("click", function () { fileMerge.click(); });
+  fileMerge.addEventListener("change", function () {
+    if (fileMerge.files[0]) mergeFile(fileMerge.files[0]);
+    fileMerge.value = "";
+  });
+
+  var fileOpen = document.getElementById("fileOpen");
+  document.getElementById("openBtn").addEventListener("click", function () { fileOpen.click(); });
+  fileOpen.addEventListener("change", function () {
+    if (fileOpen.files[0]) openFile(fileOpen.files[0]);
+    fileOpen.value = "";
+  });
+
+  document.getElementById("downloadBtn").addEventListener("click", async function () {
+    if (!window.claude || typeof window.claude.use !== "function") {
+      showToast("Downloads aren't available in this view.", true);
+      return;
+    }
+    var downloads = await window.claude.use("downloads");
+    if (!downloads) {
+      showToast("Downloads aren't available in this view.", true);
+      return;
+    }
+    var stem = sanitizeStem(el.filenameInput.value);
+    try {
+      await downloads.save({ filename: stem + ".pdf", data: state.workingBytes });
+      showToast("Saved " + stem + ".pdf");
+    } catch (err) {
+      if (err && err.code === "declined") {
+        showToast("Not saved.");
+      } else {
+        console.error(err);
+        showToast("Couldn't save the file.", true);
+      }
+    }
+  });
+
+  el.filenameInput.addEventListener("change", function () {
+    el.filenameInput.value = sanitizeStem(el.filenameInput.value);
+  });
+
+  document.getElementById("toggleLeftRail").addEventListener("click", function () {
+    el.railPages.classList.toggle("open");
+    el.railProps.classList.remove("open");
+    el.railBackdrop.classList.toggle("show", el.railPages.classList.contains("open"));
+  });
+  document.getElementById("toggleRightRail").addEventListener("click", function () {
+    el.railProps.classList.toggle("open");
+    el.railPages.classList.remove("open");
+    el.railBackdrop.classList.toggle("show", el.railProps.classList.contains("open"));
+  });
+  el.railBackdrop.addEventListener("click", function () {
+    el.railPages.classList.remove("open");
+    el.railProps.classList.remove("open");
+    el.railBackdrop.classList.remove("show");
+  });
+
+  window.addEventListener("resize", function () { renderActivePage(); });
+
+  /* ---------------- boot with a sample document ---------------- */
+
+  async function boot() {
+    try {
+      var doc = await PDFLib.PDFDocument.create();
+      var page = doc.addPage(PAGE_SIZES.Letter);
+      var heading = await doc.embedFont(PDFLib.StandardFonts.HelveticaBold);
+      var body = await doc.embedFont(PDFLib.StandardFonts.Helvetica);
+
+      page.drawText("Delivery Notice — sample", { x: 72, y: 706, size: 20, font: heading, color: PDFLib.rgb(0.094, 0.137, 0.2) });
+      page.drawText("This is an example page loaded so you can see Quire in action.", { x: 72, y: 674, size: 12, font: body, color: PDFLib.rgb(0.2, 0.259, 0.325) });
+      page.drawText("Try the highlight tool on the line below, or drag the pen to sign.", { x: 72, y: 654, size: 12, font: body, color: PDFLib.rgb(0.2, 0.259, 0.325) });
+      page.drawRectangle({ x: 70, y: 648, width: 305, height: 15, color: PDFLib.rgb(0.941, 0.663, 0.235), opacity: 0.35 });
+
+      var sig = [[72, 590], [90, 605], [105, 585], [120, 608], [140, 588], [160, 602], [178, 590]];
+      for (var i = 0; i < sig.length - 1; i++) {
+        page.drawLine({ start: { x: sig[i][0], y: sig[i][1] }, end: { x: sig[i + 1][0], y: sig[i + 1][1] }, thickness: 2, color: PDFLib.rgb(0.161, 0.322, 0.8) });
+      }
+      page.drawText("— sign here", { x: 186, y: 588, size: 10, font: body, color: PDFLib.rgb(0.357, 0.416, 0.486) });
+
+      state.workingBytes = await doc.save();
+      await loadIntoViewer();
+      el.zoomReadout.textContent = "100%";
+    } catch (err) {
+      console.error(err);
+      showToast("Couldn't set up the sample document.", true);
+    }
+  }
+
+  boot();
+})();
+</script>
+</body>
+</html>
